@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- 新增：状态栏主题色，让它看起来更像原生 App -->
+    <meta name="theme-color" content="#1e3c72">
+    <title>凑数大挑战 - 跨平台动态算式版</title>
+    <style>
+        * {
+            box-sizing: border-box; margin: 0; padding: 0;
+            user-select: none; -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            width: 100%; min-height: 100vh;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #fff; font-family: 'PingFang SC', 'Segoe UI', Tahoma, Helvetica, sans-serif;
+            overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; 
+        }
+
+        .app-container {
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: flex-start; min-height: 100vh;
+            padding: 20px 10px 40px 10px; position: relative;
+        }
+
+        /* ----- 首页选关界面 ----- */
+        #home-screen {
+            width: 100%; max-width: 600px; display: flex;
+            flex-direction: column; align-items: center; margin-top: 20px;
+            position: relative; 
+        }
+
+        .settings-btn {
+            position: absolute; top: -10px; right: 10px;
+            background-color: rgba(255,255,255,0.2); border: 2px solid rgba(255,255,255,0.3);
+            width: 45px; height: 45px; border-radius: 50%; display: flex;
+            justify-content: center; align-items: center; font-size: 1.4rem;
+            cursor: pointer; color: white; box-shadow: 0 4px 0 rgba(0,0,0,0.15); transition: all 0.1s;
+        }
+        .settings-btn:active { transform: translateY(4px); box-shadow: 0 0 0 rgba(0,0,0,0.15); }
+
+        .home-title {
+            font-size: 2.2rem; margin-bottom: 10px; color: #fbd38d;
+            text-shadow: 0 4px 10px rgba(0,0,0,0.5); font-weight: 900; text-align: center;
+        }
+        
+        .home-subtitle {
+            font-size: 1rem; color: #e2e8f0; margin-bottom: 30px; text-align: center;
+            background-color: rgba(0,0,0,0.2); padding: 5px 15px; border-radius: 20px;
+        }
+
+        /* 响应式关卡网格 */
+        .level-grid {
+            display: grid; 
+            grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); 
+            gap: 12px; width: 100%; padding: 0 10px 40px 10px;
+        }
+
+        .level-btn {
+            aspect-ratio: 1; border-radius: 12px; font-size: 1.2rem; font-weight: bold;
+            display: flex; justify-content: center; align-items: center;
+            background-color: #48bb78; color: white; box-shadow: 0 5px 0 #2f855a;
+            cursor: pointer; transition: all 0.1s;
+        }
+        .level-btn:active { transform: translateY(5px); box-shadow: 0 0 0 #2f855a; }
+        .level-btn.locked { background-color: rgba(113, 128, 150, 0.6); box-shadow: 0 5px 0 rgba(74, 85, 104, 0.6); color: rgba(255,255,255,0.4); }
+
+        /* ----- 游戏主界面 ----- */
+        #game-screen {
+            display: none; flex-direction: column; align-items: center; width: 100%; 
+            /* max-width 将由 JS 根据屏幕动态设置 */
+        }
+
+        /* 顶部组件改为 100% 宽度，自适应外层容器 */
+        #top-nav, #header, #level-info, #board-wrapper { width: 100%; }
+
+        #top-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+
+        .icon-btn {
+            background-color: rgba(255,255,255,0.2); border: 2px solid rgba(255,255,255,0.3);
+            width: 45px; height: 45px; border-radius: 50%; display: flex; justify-content: center;
+            align-items: center; font-size: 1.4rem; cursor: pointer; color: white;
+            box-shadow: 0 4px 0 rgba(0,0,0,0.15); transition: all 0.1s; flex-shrink: 0;
+        }
+        .icon-btn:active { transform: translateY(4px); box-shadow: 0 0 0 rgba(0,0,0,0.15); }
+        .ai-btn { background-color: #9f7aea; border-color: #805ad5; box-shadow: 0 4px 0 #6b46c1; }
+
+        .level-badge-container { display: flex; flex-direction: column; align-items: center; flex-grow: 1; padding: 0 10px; }
+        .level-badge {
+            background-color: #f6ad55; color: #2d3748; padding: 6px 20px; border-radius: 20px;
+            font-size: 1.2rem; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            white-space: nowrap;
+        }
+        .target-hint {
+            font-size: 0.95rem; color: #fbd38d; font-weight: 900; margin-top: 4px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5); letter-spacing: 1px; white-space: nowrap;
+        }
+
+        #header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 10px; }
+        .stat-box { display: flex; flex-direction: column; flex-shrink: 0; }
+        .stat-label { font-size: 0.85rem; color: #a0aec0; margin-bottom: 2px; }
+        .stat-value { font-size: 1.8rem; font-weight: 800; color: #fff; }
+
+        #level-info {
+            background-color: rgba(0, 0, 0, 0.2); border-radius: 15px;
+            padding: 10px 15px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 8px;
+        }
+        .level-header { display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 1rem; color: #e2e8f0; }
+        .progress-bar-container { width: 100%; height: 12px; background-color: rgba(255,255,255,0.2); border-radius: 6px; overflow: hidden; }
+        #progress-fill { height: 100%; width: 100%; background-color: #48bb78; transition: width 0.3s ease, background-color 0.3s; }
+
+        /* 算式显示器 - 支持长内容截断或滚动 */
+        #sum-indicator {
+            background-color: rgba(255, 255, 255, 0.2); padding: 8px 15px; border-radius: 20px;
+            font-size: 1.3rem; font-weight: bold; text-align: right; min-width: 100px;
+            flex-grow: 1; transition: all 0.2s; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .sum-valid { background-color: #48bb78 !important; color: white; transform: scale(1.05); box-shadow: 0 0 15px #48bb78 !important; }
+        .sum-error { background-color: #f56565 !important; color: white; animation: shake 0.3s; }
+
+        /* 动态棋盘容器 */
+        #board-wrapper {
+            position: relative; background-color: rgba(0, 0, 0, 0.3); border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5), inset 0 0 20px rgba(0,0,0,0.5);
+            overflow: hidden; touch-action: none; margin: 0 auto;
+        }
+
+        #tiles-container, #svg-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        #svg-layer { pointer-events: none; z-index: 5; }
+
+        /* --- 新增：选中方块的呼吸发光特效 --- */
+        @keyframes pulse-glow {
+            0% { transform: scale(1.15); box-shadow: inset 0 -4px 0 rgba(0,0,0,0.2), 0 0 15px rgba(255,255,255,0.6); border-color: rgba(255,255,255,0.8); }
+            50% { transform: scale(1.22); box-shadow: inset 0 -4px 0 rgba(0,0,0,0.2), 0 0 25px rgba(255,255,255,1); border-color: rgba(255,255,255,1); }
+            100% { transform: scale(1.15); box-shadow: inset 0 -4px 0 rgba(0,0,0,0.2), 0 0 15px rgba(255,255,255,0.6); border-color: rgba(255,255,255,0.8); }
+        }
+
+        .tile {
+            position: absolute; width: 50px; height: 50px; border-radius: 10px;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 1.4rem; font-weight: bold; color: white; text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+            transition: top 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), left 0.3s ease, transform 0.1s;
+            box-shadow: inset 0 -4px 0 rgba(0,0,0,0.2), 0 4px 6px rgba(0,0,0,0.3); z-index: 2;
+        }
+        .tile.selected {
+            z-index: 10; border: 2px solid white;
+            animation: pulse-glow 0.8s infinite; /* 激活呼吸特效 */
+        }
+
+        /* --- 新增：消除时的彩色粒子爆炸特效 --- */
+        .particle {
+            position: absolute; border-radius: 50%; pointer-events: none; z-index: 25;
+            animation: explode 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        @keyframes explode {
+            0% { transform: scale(1) translate(0, 0); opacity: 1; }
+            100% { transform: scale(0) translate(var(--tx), var(--ty)); opacity: 0; }
+        }
+
+        /* --- 新增：长连击的夸奖文字特效 --- */
+        .combo-text {
+            position: absolute; font-size: 2rem; font-weight: 900; color: #ffeb3b; pointer-events: none;
+            z-index: 30; text-shadow: 0 4px 8px rgba(0,0,0,0.5); white-space: nowrap;
+            animation: floatCombo 1.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        @keyframes floatCombo {
+            0% { transform: translate(-50%, -50%) scale(0.2) rotate(-10deg); opacity: 0; }
+            20% { transform: translate(-50%, -100%) scale(1.2) rotate(5deg); opacity: 1; }
+            80% { transform: translate(-50%, -150%) scale(1) rotate(0deg); opacity: 1; }
+            100% { transform: translate(-50%, -200%) scale(0.8); opacity: 0; }
+        }
+
+        .floating-score {
+            position: absolute; color: #fbd38d; font-size: 1.5rem; font-weight: bold; pointer-events: none;
+            z-index: 20; text-shadow: 0 2px 4px rgba(0,0,0,0.5); animation: floatUp 1s ease-out forwards;
+        }
+        @keyframes floatUp { 0% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { transform: translate(-50%, -150%) scale(1.5); opacity: 0; } }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+
+        /* 弹窗样式 */
+        #modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7);
+            display: none; justify-content: center; align-items: center; z-index: 100; backdrop-filter: blur(4px);
+        }
+        .modal-box {
+            background: white; color: #2d3748; padding: 30px; border-radius: 20px; text-align: center;
+            width: 85%; max-width: 340px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes popIn { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        #modal-title { font-size: 1.8rem; margin-bottom: 10px; }
+        #modal-desc { font-size: 1.1rem; color: #718096; margin-bottom: 25px; line-height: 1.5; }
+        
+        .modal-btn {
+            background-color: #4299e1; border: none; color: white; padding: 12px 25px; font-size: 1.1rem;
+            font-weight: bold; border-radius: 25px; cursor: pointer; box-shadow: 0 4px 0 #2b6cb0; transition: all 0.1s; margin: 5px;
+        }
+        .modal-btn:active { transform: translateY(4px); box-shadow: 0 0 0 #2b6cb0; }
+        .modal-btn.secondary { background-color: #ed8936; box-shadow: 0 4px 0 #c05621; }
+        .modal-btn.secondary:active { box-shadow: 0 0 0 #c05621; }
+
+        .settings-input {
+            width: 80%; padding: 10px; font-size: 1.5rem; text-align: center;
+            border: 2px solid #cbd5e0; border-radius: 10px; margin: 15px 0;
+            color: #2d3748; outline: none; transition: border-color 0.2s;
+        }
+        .settings-input:focus { border-color: #4299e1; }
+
+        .ai-chat-bubble {
+            background-color: #f3e8ff; border: 2px solid #d6bcfa; border-radius: 15px; padding: 15px;
+            color: #553c9a; font-weight: 600; text-align: left; margin-bottom: 20px; position: relative;
+        }
+        .ai-chat-bubble::after {
+            content: ''; position: absolute; bottom: 100%; left: 50%; margin-left: -10px;
+            border-width: 10px; border-style: solid; border-color: transparent transparent #d6bcfa transparent;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- ----- 首页选关界面 ----- -->
+        <div id="home-screen">
+            <button class="settings-btn" onclick="openSettings()" title="设置目标分数">⚙️</button>
+            <h1 class="home-title">凑数大挑战</h1>
+            <p class="home-subtitle" id="home-target-hint">当前目标：连线相加 = 10</p>
+            <div class="level-grid" id="level-grid"></div>
+        </div>
+
+        <!-- ----- 游戏主界面 ----- -->
+        <div id="game-screen">
+            <div id="top-nav">
+                <button class="icon-btn" onclick="showHome()" title="返回首页">🏠</button>
+                <div class="level-badge-container">
+                    <span class="level-badge" id="level-badge">第 1 关</span>
+                    <span class="target-hint" id="game-target-hint">🎯 找数字相加 = 10</span>
+                </div>
+                <button class="icon-btn ai-btn" onclick="askAIHelper()" title="问问本地魔法精灵">🤖</button>
+                <button class="icon-btn" onclick="restartLevel()" title="重新开始本关">↻</button>
+            </div>
+
+            <div id="header">
+                <div class="stat-box">
+                    <div class="stat-label">总分数</div>
+                    <div class="stat-value" id="score">0</div>
+                </div>
+                <!-- 算式指示器 -->
+                <div id="sum-indicator">0</div>
+            </div>
+
+            <div id="level-info">
+                <div class="level-header">
+                    <span id="target-text">需要消除所有数字！剩余: 0</span>
+                </div>
+                <div class="progress-bar-container">
+                    <div id="progress-fill"></div>
+                </div>
+            </div>
+
+            <div id="board-wrapper">
+                <svg id="svg-layer"></svg>
+                <div id="tiles-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ----- 统一弹窗界面 ----- -->
+    <div id="modal-overlay">
+        <div class="modal-box">
+            <h2 id="modal-title" style="color: #48bb78;">标题</h2>
+            <div id="modal-desc">内容描述</div>
+            <div id="modal-actions"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- 核心动态目标配置 ---
+        let TARGET_SUM = parseInt(localStorage.getItem('plus_math_target')) || 10;
+        
+        const PALETTE = [
+            '#a0aec0', '#fc8181', '#f6ad55', '#f6e05e', '#68d391', '#4fd1c5', '#63b3ed', '#7f9cf5', 
+            '#b794f4', '#f687b3', '#e53e3e', '#dd6b20', '#d69e2e', '#38a169', '#319795', '#3182ce', 
+            '#5a67d8', '#805ad5', '#d53f8c', '#718096'
+        ];
+        function getColor(val) { return PALETTE[val % PALETTE.length]; }
+
+        // --- 动态网格系统 (Responsive Grid) ---
+        // 不再写死 COLS 和 ROWS，根据设备屏幕实时计算
+        let COLS = 6;
+        let ROWS = 8;
+        const TILE_SIZE = 55; 
+        const OFFSET_X = 2.5; 
+        const OFFSET_Y = 2.5; 
+        const TOTAL_LEVELS = 100;
+
+        const homeScreen = document.getElementById('home-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const levelGrid = document.getElementById('level-grid');
+        const tilesContainer = document.getElementById('tiles-container');
+        const svgLayer = document.getElementById('svg-layer');
+        const boardWrapper = document.getElementById('board-wrapper');
+        const scoreEl = document.getElementById('score');
+        const sumIndicator = document.getElementById('sum-indicator');
+        const progressFill = document.getElementById('progress-fill');
+        const targetText = document.getElementById('target-text');
+        const levelBadge = document.getElementById('level-badge');
+        
+        const modalOverlay = document.getElementById('modal-overlay');
+        const modalTitle = document.getElementById('modal-title');
+        const modalDesc = document.getElementById('modal-desc');
+        const modalActions = document.getElementById('modal-actions');
+        const homeTargetHint = document.getElementById('home-target-hint');
+        const gameTargetHint = document.getElementById('game-target-hint');
+
+        let unlockedLevel = 1;
+        let currentLevel = 1;
+        let board = []; 
+        let path = [];  
+        let isDragging = false;
+        let currentSum = 0;
+        let totalScore = 0;
+        let scoreAtLevelStart = 0; // 新增：记录每一关开局时的分数，用于回档
+        let initialTiles = 0;   
+        let tilesRemaining = 0; 
+        let isLevelComplete = false;
+        let isProcessingGravity = false; 
+
+        // 动态计算最佳网格尺寸
+        function calculateGridSize() {
+            // 预留 UI 空间：左右各 20px padding，顶部和底部保留给 UI 元素
+            let availableW = window.innerWidth - 40; 
+            let availableH = window.innerHeight - 250; 
+            
+            // 如果是横屏手机，可用高度极小，需要特殊处理
+            if (window.innerWidth > window.innerHeight) {
+                availableH = window.innerHeight - 150; 
+            }
+
+            COLS = Math.max(5, Math.floor(availableW / TILE_SIZE));
+            ROWS = Math.max(5, Math.floor(availableH / TILE_SIZE));
+
+            // 设置上限，防止在 4K 大屏上出现几百个格子密集恐惧症
+            COLS = Math.min(COLS, 14); // iPad 横屏足够
+            ROWS = Math.min(ROWS, 12); 
+
+            // 动态应用尺寸到容器
+            const gameWidth = (COLS * TILE_SIZE) + 'px';
+            const gameHeight = (ROWS * TILE_SIZE) + 'px';
+            
+            boardWrapper.style.width = gameWidth;
+            boardWrapper.style.height = gameHeight;
+            gameScreen.style.maxWidth = gameWidth;
+        }
+
+        function loadProgress() {
+            const saved = localStorage.getItem('plus_math_unlocked');
+            if (saved) unlockedLevel = parseInt(saved);
+            updateTargetLabels();
+        }
+
+        function saveProgress(level) {
+            if (level > unlockedLevel && level <= TOTAL_LEVELS) {
+                unlockedLevel = level;
+                localStorage.setItem('plus_math_unlocked', unlockedLevel);
+            }
+        }
+
+        function updateTargetLabels() {
+            homeTargetHint.textContent = `当前目标：连线相加 = ${TARGET_SUM}`;
+            gameTargetHint.textContent = `🎯 找数字相加 = ${TARGET_SUM}`;
+        }
+
+        // --- 新增：跨平台硬件震动反馈 (Haptic) ---
+        function triggerVibrate(pattern) {
+            // 检查设备是否支持震动 API
+            if (navigator.vibrate) {
+                try { navigator.vibrate(pattern); } catch (e) {}
+            }
+        }
+
+        let audioCtx;
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        // --- 升级：加入音调递增机制 ---
+        function playSound(type, param = 0) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode); gainNode.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+
+            if (type === 'select') {
+                // 核心多巴胺机制：连线越长，音调越高 (每次升高 60Hz)
+                let baseFreq = 400 + (param * 60); 
+                osc.type = 'sine'; osc.frequency.setValueAtTime(baseFreq, now);
+                gainNode.gain.setValueAtTime(0.1, now); gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                osc.start(now); osc.stop(now + 0.15);
+            } else if (type === 'deselect') {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(300, now);
+                gainNode.gain.setValueAtTime(0.1, now); gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now); osc.stop(now + 0.1);
+            } else if (type === 'error') {
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(200, now); osc.frequency.exponentialRampToValueAtTime(100, now + 0.3);
+                gainNode.gain.setValueAtTime(0.15, now); gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                osc.start(now); osc.stop(now + 0.3);
+            } else if (type === 'clear') {
+                osc.type = 'triangle'; osc.frequency.setValueAtTime(523.25, now); osc.frequency.setValueAtTime(659.25, now + 0.1);
+                gainNode.gain.setValueAtTime(0.1, now); gainNode.gain.linearRampToValueAtTime(0, now + 0.4);
+                osc.start(now); osc.stop(now + 0.4);
+            } else if (type === 'win') {
+                osc.type = 'square'; osc.frequency.setValueAtTime(440, now); osc.frequency.setValueAtTime(659.25, now + 0.2);
+                gainNode.gain.setValueAtTime(0.1, now); gainNode.gain.linearRampToValueAtTime(0, now + 0.6);
+                osc.start(now); osc.stop(now + 0.6);
+            }
+        }
+
+        function openSettings() {
+            playSound('select');
+            modalTitle.textContent = "⚙️ 游戏设置"; modalTitle.style.color = "#4299e1";
+            modalDesc.innerHTML = `
+                <p style="font-size:1rem; color:#718096; margin-bottom:10px;">请输入新的通关目标数 (10 - 100):</p>
+                <input type="number" id="target-input" class="settings-input" value="${TARGET_SUM}" min="10" max="100">
+            `;
+            modalActions.innerHTML = `
+                <button class="modal-btn secondary" onclick="closeModal()">取消</button>
+                <button class="modal-btn" onclick="saveTargetSettings()">保存设置</button>
+            `;
+            modalOverlay.style.display = 'flex';
+        }
+
+        function saveTargetSettings() {
+            playSound('select');
+            const inputVal = parseInt(document.getElementById('target-input').value);
+            
+            if (isNaN(inputVal)) { alert("请输入有效的数字哦！"); return; } 
+            else if (inputVal < 10) { alert("目标分数太小啦，最小数字为 10 哦！"); return; } 
+            else if (inputVal > 100) { alert("目标分数太大啦，最大数字为 100 哦！"); return; }
+
+            if (TARGET_SUM !== inputVal) {
+                TARGET_SUM = inputVal;
+                localStorage.setItem('plus_math_target', TARGET_SUM);
+                unlockedLevel = 1;
+                localStorage.setItem('plus_math_unlocked', unlockedLevel);
+                updateTargetLabels();
+                renderHome(); 
+                
+                // 新增：如果在游戏内修改了目标，直接强制从第1关重开（分数也会随之清零）
+                if (gameScreen.style.display === 'flex') {
+                    loadLevel(1);
+                }
+            }
+            closeModal();
+        }
+
+        function closeModal() { modalOverlay.style.display = 'none'; }
+
+        function renderHome() {
+            levelGrid.innerHTML = '';
+            for (let i = 1; i <= TOTAL_LEVELS; i++) {
+                let btn = document.createElement('div');
+                btn.className = 'level-btn ' + (i > unlockedLevel ? 'locked' : '');
+                btn.textContent = i;
+                btn.onclick = () => {
+                    if (i <= unlockedLevel) { initAudio(); loadLevel(i); } 
+                    else { btn.style.animation = 'shake 0.2s'; setTimeout(() => btn.style.animation = '', 200); }
+                };
+                levelGrid.appendChild(btn);
+            }
+        }
+
+        function showHome() { gameScreen.style.display = 'none'; homeScreen.style.display = 'flex'; renderHome(); }
+        
+        function restartLevel() { 
+            initAudio(); 
+            // 严谨逻辑：重新开始本关时，撤销本局已得的分数，回档到开局状态
+            totalScore = scoreAtLevelStart; 
+            loadLevel(currentLevel, true); 
+        }
+
+        function generateChunkNumbers(size, level) {
+            if (size === 2 && level <= 3) {
+                let v = Math.floor(Math.random() * (TARGET_SUM - 1)) + 1; 
+                return [v, TARGET_SUM - v];
+            }
+            let arr = Array(size).fill(0);
+            let remaining = TARGET_SUM;
+            let zerosAllowed = level > 20;
+
+            if (!zerosAllowed && size <= TARGET_SUM) {
+                for (let i = 0; i < size; i++) { arr[i] = 1; remaining--; }
+            }
+
+            while (remaining > 0) {
+                let idx = Math.floor(Math.random() * size);
+                if (arr[idx] < TARGET_SUM - 1 || size === 1) { arr[idx]++; remaining--; } 
+                else {
+                    let canAdd = false;
+                    for(let i=0; i<size; i++) { if (arr[i] < TARGET_SUM - 1) { canAdd = true; break; } }
+                    if (!canAdd) { arr[idx]++; remaining--; } 
+                }
+            }
+            return arr;
+        }
+
+        function generateReverseBoard(level) {
+            // 根据设备最大行数动态调整难度增速，行数越多，成长曲线越平滑
+            let numRows = Math.min(ROWS, 3 + Math.floor((level - 1) / 8));
+            let layout = Array(numRows).fill().map(() => Array(COLS).fill(-1));
+            
+            let maxSize = 2;
+            if (level > 5) maxSize = 3;
+            if (level > 20) maxSize = 4;
+            if (level > 40) maxSize = 5;
+
+            let groups = {}; let groupId = 0;
+
+            for (let r = 0; r < numRows; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    if (layout[r][c] === -1) {
+                        let targetSize = 2 + Math.floor(Math.random() * (maxSize - 1));
+                        let currentSize = 1;
+                        layout[r][c] = groupId; groups[groupId] = [{r, c}];
+                        let frontier = [{r, c}];
+                        
+                        while (currentSize < targetSize && frontier.length > 0) {
+                            let fIdx = Math.floor(Math.random() * frontier.length);
+                            let curr = frontier[fIdx]; let neighbors = [];
+                            const dirs = [[-1,0], [1,0], [0,-1], [0,1]];
+                            
+                            for (let d of dirs) {
+                                let nr = curr.r + d[0], nc = curr.c + d[1];
+                                if (nr >= 0 && nr < numRows && nc >= 0 && nc < COLS && layout[nr][nc] === -1) {
+                                    neighbors.push({r: nr, c: nc});
+                                }
+                            }
+                            
+                            if (neighbors.length > 0) {
+                                let next = neighbors[Math.floor(Math.random() * neighbors.length)];
+                                layout[next.r][next.c] = groupId; groups[groupId].push(next);
+                                frontier.push(next); currentSize++;
+                            } else { frontier.splice(fIdx, 1); }
+                        }
+                        groupId++;
+                    }
+                }
+            }
+
+            for (let gid in groups) {
+                if (groups[gid].length === 1) {
+                    let cell = groups[gid][0];
+                    const dirs = [[-1,0], [1,0], [0,-1], [0,1]];
+                    for (let d of dirs) {
+                        let nr = cell.r + d[0], nc = cell.c + d[1];
+                        if (nr >= 0 && nr < numRows && nc >= 0 && nc < COLS) {
+                            let adjGid = layout[nr][nc];
+                            if (adjGid !== gid && adjGid !== -1) {
+                                layout[cell.r][cell.c] = adjGid; groups[adjGid].push(cell);
+                                delete groups[gid]; break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            let valueGrid = Array(numRows).fill().map(() => Array(COLS).fill(0));
+            for (let gid in groups) {
+                let size = groups[gid].length;
+                let numbers = generateChunkNumbers(size, level);
+                
+                for (let i = groups[gid].length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [groups[gid][i], groups[gid][j]] = [groups[gid][j], groups[gid][i]];
+                }
+                
+                for (let i = 0; i < size; i++) {
+                    let cell = groups[gid][i]; valueGrid[cell.r][cell.c] = numbers[i];
+                }
+            }
+
+            return { numRows, valueGrid };
+        }
+
+        function loadLevel(level, isRestart = false) {
+            currentLevel = level; isLevelComplete = false; isProcessingGravity = false;
+            
+            // --- 新增：严谨的积分记录与重置逻辑 ---
+            if (!isRestart) {
+                // 如果不是刷新本关，而是进入新关卡或选关
+                if (level === 1) {
+                    totalScore = 0; // 从第一关起步，分数强制清零
+                }
+                scoreAtLevelStart = totalScore; // 锁定并记录这关开局时的分数
+            }
+
+            modalOverlay.style.display = 'none'; homeScreen.style.display = 'none'; gameScreen.style.display = 'flex';
+            levelBadge.textContent = `第 ${level} 关`;
+            scoreEl.textContent = totalScore; // 同步更新右上角的总分UI
+
+            // 每次加载关卡前，重新计算当前屏幕的最佳网格布局
+            calculateGridSize();
+
+            let levelData = generateReverseBoard(level);
+            initialTiles = levelData.numRows * COLS; tilesRemaining = initialTiles;
+            updateProgress();
+
+            tilesContainer.innerHTML = ''; svgLayer.innerHTML = ''; sumIndicator.textContent = '0';
+            board = Array(ROWS).fill().map(() => Array(COLS).fill(null));
+            
+            for (let r = ROWS - levelData.numRows; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    let gridRow = r - (ROWS - levelData.numRows);
+                    let val = levelData.valueGrid[gridRow][c];
+                    spawnTile(r, c, val, ROWS - r); 
+                }
+            }
+        }
+
+        function updateProgress() {
+            targetText.textContent = `剩余需消除数字: ${tilesRemaining}`;
+            let percent = (tilesRemaining / initialTiles) * 100;
+            progressFill.style.width = percent + '%';
+            if (percent < 30) progressFill.style.backgroundColor = '#ed8936'; 
+            else progressFill.style.backgroundColor = '#48bb78'; 
+        }
+
+        function spawnTile(r, c, val, dropOffset = 0) {
+            let el = document.createElement('div');
+            el.className = 'tile'; el.textContent = val; el.style.backgroundColor = getColor(val);
+            let x = c * TILE_SIZE + OFFSET_X; let targetY = r * TILE_SIZE + OFFSET_Y;
+            let startY = targetY - (dropOffset * TILE_SIZE); 
+            el.style.left = x + 'px'; el.style.top = startY + 'px';
+            
+            let tileObj = { r, c, val, el };
+            board[r][c] = tileObj; tilesContainer.appendChild(el);
+            if (dropOffset > 0) setTimeout(() => { el.style.top = targetY + 'px'; }, 50);
+        }
+
+        // --- 交互与滑动连线 ---
+        boardWrapper.addEventListener('pointerdown', startDrag);
+        window.addEventListener('pointermove', onDrag);
+        window.addEventListener('pointerup', endDrag);
+
+        function startDrag(e) {
+            if (isLevelComplete || isProcessingGravity) return; 
+            initAudio(); isDragging = true; path = []; currentSum = 0; handlePointerOver(e); 
+        }
+
+        function onDrag(e) {
+            if (!isDragging || isLevelComplete || isProcessingGravity) return;
+            handlePointerOver(e);
+        }
+
+        function handlePointerOver(e) {
+            const rect = boardWrapper.getBoundingClientRect();
+            // 支持触摸和鼠标坐标的兼容获取
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            
+            const x = clientX - rect.left, y = clientY - rect.top;
+            const c = Math.floor(x / TILE_SIZE), r = Math.floor(y / TILE_SIZE);
+
+            if (r >= 0 && r < ROWS && c >= 0 && c < COLS) {
+                let tile = board[r][c];
+                if (!tile) return;
+
+                if (path.length === 0) addTileToPath(tile);
+                else {
+                    let lastTile = path[path.length - 1];
+                    if (path.length > 1 && tile === path[path.length - 2]) removeLastTile();
+                    else if (!path.includes(tile) && isAdjacent(lastTile, tile)) addTileToPath(tile);
+                }
+            }
+        }
+
+        function isAdjacent(t1, t2) { return Math.abs(t1.r - t2.r) <= 1 && Math.abs(t1.c - t2.c) <= 1; }
+
+        function addTileToPath(tile) {
+            path.push(tile); tile.el.classList.add('selected');
+            currentSum += tile.val; 
+            playSound('select', path.length); // 传入路径长度提升音调
+            triggerVibrate(15); // 轻微 Tick 触觉反馈
+            updateFeedback();
+        }
+
+        function removeLastTile() {
+            let removed = path.pop(); removed.el.classList.remove('selected');
+            currentSum -= removed.val; 
+            playSound('deselect'); 
+            triggerVibrate(10); // 退回时轻微震动
+            updateFeedback();
+        }
+
+        // --- 核心更新：动态算式指示器 ---
+        function updateFeedback() {
+            if (path.length > 0) {
+                // 将连线路径转化为算式字符串：2 + 3 + 9 = 14
+                const equationStr = path.map(t => t.val).join(' + ') + ' = ' + currentSum;
+                sumIndicator.textContent = equationStr;
+            } else {
+                sumIndicator.textContent = '0';
+            }
+
+            sumIndicator.className = '';
+            if (currentSum === TARGET_SUM) sumIndicator.classList.add('sum-valid');
+            else if (currentSum > TARGET_SUM) sumIndicator.classList.add('sum-error');
+            drawPathLines();
+        }
+
+        function drawPathLines() {
+            svgLayer.innerHTML = ''; 
+            if (path.length < 2) return;
+            let d = '';
+            path.forEach((tile, index) => {
+                let centerX = tile.c * TILE_SIZE + OFFSET_X + 25, centerY = tile.r * TILE_SIZE + OFFSET_Y + 25;
+                if (index === 0) d += `M ${centerX} ${centerY} `; else d += `L ${centerX} ${centerY} `;
+            });
+            let lineColor = "rgba(255, 255, 255, 0.6)"; 
+            if (currentSum === TARGET_SUM) lineColor = "#48bb78"; 
+            if (currentSum > TARGET_SUM) lineColor = "#f56565";   
+
+            let pathEl = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            pathEl.setAttribute("d", d); pathEl.setAttribute("stroke", lineColor);
+            pathEl.setAttribute("stroke-width", "8"); pathEl.setAttribute("fill", "none");
+            pathEl.setAttribute("stroke-linecap", "round"); pathEl.setAttribute("stroke-linejoin", "round");
+            
+            // 新增：底层发光霓虹特效
+            let shadowEl = pathEl.cloneNode();
+            shadowEl.setAttribute("stroke", lineColor);
+            shadowEl.setAttribute("stroke-width", "18");
+            shadowEl.setAttribute("opacity", "0.3");
+            
+            svgLayer.appendChild(shadowEl);
+            svgLayer.appendChild(pathEl);
+        }
+
+        function endDrag() {
+            if (!isDragging) return;
+            isDragging = false;
+            if (currentSum === TARGET_SUM) processClear();
+            else {
+                if(currentSum > TARGET_SUM) {
+                    playSound('error'); 
+                    triggerVibrate([50, 50, 50]); // 错误时强烈震动提示
+                }
+                path.forEach(t => t.el.classList.remove('selected'));
+            }
+            path = []; currentSum = 0; sumIndicator.textContent = '0';
+            sumIndicator.className = ''; svgLayer.innerHTML = '';
+        }
+
+        function processClear() {
+            playSound('clear'); isProcessingGravity = true; 
+            triggerVibrate([30, 50, 30]); // 成功消除时欢快震动
+
+            let earnedScore = TARGET_SUM * path.length; totalScore += earnedScore; scoreEl.textContent = totalScore;
+            
+            let lastT = path[path.length - 1];
+            showFloatingScore(lastT.c, lastT.r, earnedScore, path.length); // 传入连线长度判断连击
+
+            path.forEach(tile => { 
+                // 触发粒子爆炸特效
+                createParticles(tile.c * TILE_SIZE + OFFSET_X + 25, tile.r * TILE_SIZE + OFFSET_Y + 25, tile.el.style.backgroundColor);
+                tile.el.remove(); board[tile.r][tile.c] = null; 
+            });
+            tilesRemaining -= path.length; updateProgress(); applyGravity();
+        }
+
+        // --- 新增：粒子爆炸生成器 ---
+        function createParticles(x, y, color) {
+            for (let i = 0; i < 8; i++) {
+                let p = document.createElement('div');
+                p.className = 'particle';
+                p.style.backgroundColor = color;
+                p.style.width = '10px'; p.style.height = '10px';
+                p.style.left = (x - 5) + 'px'; p.style.top = (y - 5) + 'px';
+                
+                // 随机爆炸方向和距离
+                let angle = Math.random() * Math.PI * 2;
+                let dist = 30 + Math.random() * 40;
+                p.style.setProperty('--tx', Math.cos(angle) * dist + 'px');
+                p.style.setProperty('--ty', Math.sin(angle) * dist + 'px');
+                
+                boardWrapper.appendChild(p);
+                setTimeout(() => p.remove(), 600);
+            }
+        }
+
+        function showFloatingScore(c, r, score, length) {
+            let x = c * TILE_SIZE + OFFSET_X + 25;
+            let y = r * TILE_SIZE + OFFSET_Y + 25;
+
+            let el = document.createElement('div'); el.className = 'floating-score'; el.textContent = '+' + score;
+            el.style.left = x + 'px'; el.style.top = y + 'px';
+            boardWrapper.appendChild(el); setTimeout(() => el.remove(), 1000); 
+
+            // --- 新增：连击赞美文字触发机制 ---
+            if (length >= 3) {
+                let praiseWords = ["太棒啦!", "连击!", "真聪明!", "神机妙算!", "太完美啦!"];
+                // 连得越长，夸得越厉害
+                let wordIndex = Math.min(length - 3, praiseWords.length - 1);
+                let textEl = document.createElement('div');
+                textEl.className = 'combo-text'; textEl.textContent = praiseWords[wordIndex];
+                
+                // 超过4连击给出特殊颜色和更大字体
+                if (length >= 4) { textEl.style.color = '#ff9800'; textEl.style.fontSize = '2.5rem'; }
+                
+                textEl.style.left = x + 'px'; textEl.style.top = (y - 40) + 'px';
+                boardWrapper.appendChild(textEl);
+                setTimeout(() => textEl.remove(), 1500);
+            }
+        }
+
+        function applyGravity() {
+            for (let c = 0; c < COLS; c++) {
+                let writeR = ROWS - 1; 
+                for (let r = ROWS - 1; r >= 0; r--) {
+                    if (board[r][c] !== null) {
+                        if (r !== writeR) {
+                            board[writeR][c] = board[r][c]; board[r][c] = null;
+                            board[writeR][c].r = writeR; board[writeR][c].el.style.top = (writeR * TILE_SIZE + OFFSET_Y) + 'px';
+                        }
+                        writeR--;
+                    }
+                }
+            }
+
+            let writeC = 0;
+            for (let readC = 0; readC < COLS; readC++) {
+                let isEmpty = true;
+                for (let r = 0; r < ROWS; r++) { if (board[r][readC] !== null) { isEmpty = false; break; } }
+                if (!isEmpty) {
+                    if (writeC !== readC) {
+                        for (let r = 0; r < ROWS; r++) {
+                            board[r][writeC] = board[r][readC]; board[r][readC] = null;
+                            if (board[r][writeC] !== null) {
+                                board[r][writeC].c = writeC; board[r][writeC].el.style.left = (writeC * TILE_SIZE + OFFSET_X) + 'px';
+                            }
+                        }
+                    }
+                    writeC++;
+                }
+            }
+
+            setTimeout(() => {
+                isProcessingGravity = false;
+                if (tilesRemaining === 0) showWinModal();
+                else if (!hasValidMove()) showStuckModal();
+            }, 350);
+        }
+
+        function hasValidMove() {
+            if (tilesRemaining === 0) return true; 
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    if (board[r][c] !== null && dfs(r, c, 0, [])) return true; 
+                }
+            }
+            return false; 
+        }
+
+        function dfs(r, c, currentSum, visited) {
+            let tile = board[r][c]; if (!tile) return false;
+            let newSum = currentSum + tile.val;
+            if (newSum === TARGET_SUM) return true;
+            if (newSum > TARGET_SUM) return false;
+            visited.push(`${r},${c}`);
+            for (let dr = -1; dr <= 1; dr++) {
+                for (let dc = -1; dc <= 1; dc++) {
+                    if (dr === 0 && dc === 0) continue;
+                    let nr = r + dr, nc = c + dc;
+                    if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && board[nr][nc]) {
+                        if (!visited.includes(`${nr},${nc}`) && dfs(nr, nc, newSum, [...visited])) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function showWinModal() {
+            if (isLevelComplete) return;
+            isLevelComplete = true; playSound('win'); saveProgress(currentLevel + 1);
+            triggerVibrate([100, 50, 100, 50, 100]); // 过关强力庆祝震动
+
+            modalTitle.textContent = "太棒啦！"; modalTitle.style.color = "#48bb78";
+            modalDesc.innerHTML = `你成功清空了所有数字！<br>完成了第 <b>${currentLevel}</b> 关。`;
+            modalActions.innerHTML = `<button class="modal-btn secondary" onclick="showHome()">返回首页</button>` + 
+                (currentLevel < TOTAL_LEVELS ? `<button class="modal-btn" onclick="loadLevel(${currentLevel + 1})">下一关</button>` : '');
+            modalOverlay.style.display = 'flex';
+        }
+
+        function showStuckModal() {
+            if (isLevelComplete) return;
+            playSound('error'); modalTitle.textContent = "哎呀！"; modalTitle.style.color = "#f56565";
+            modalDesc.textContent = `当前剩下的数字好像凑不出 ${TARGET_SUM} 了，重试一次吧？`;
+            modalActions.innerHTML = `<button class="modal-btn secondary" onclick="showHome()">返回首页</button><button class="modal-btn" onclick="restartLevel()">重新挑战</button>`;
+            modalOverlay.style.display = 'flex';
+        }
+
+        // --- 本地魔法精灵提示 (DFS搜索) ---
+        function findOneValidPath() {
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    if (board[r][c] !== null) {
+                        let path = findPathDFS(r, c, 0, [], []);
+                        if (path) return path;
+                    }
+                }
+            }
+            return null;
+        }
+
+        function findPathDFS(r, c, currentSum, visitedCoords, pathValues) {
+            let tile = board[r][c]; if (!tile) return null;
+            let newSum = currentSum + tile.val;
+            let newVisited = [...visitedCoords, `${r},${c}`];
+            let newPathVals = [...pathValues, tile.val];
+
+            if (newSum === TARGET_SUM) return newPathVals;
+            if (newSum > TARGET_SUM) return null;
+
+            for (let dr = -1; dr <= 1; dr++) {
+                for (let dc = -1; dc <= 1; dc++) {
+                    if (dr === 0 && dc === 0) continue;
+                    let nr = r + dr, nc = c + dc;
+                    if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && board[nr][nc]) {
+                        if (!visitedCoords.includes(`${nr},${nc}`)) {
+                            let res = findPathDFS(nr, nc, newSum, newVisited, newPathVals);
+                            if (res) return res;
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+
+        function askAIHelper() {
+            playSound('select');
+            modalTitle.textContent = "🤖 魔法精灵来啦"; modalTitle.style.color = "#9f7aea";
+            modalActions.innerHTML = `<button class="modal-btn secondary" onclick="closeModal()">我知道啦</button>`;
+            
+            const validPath = findOneValidPath();
+            
+            if (validPath) {
+                const hintText = `魔法精灵偷偷观察了一下，发现把 <b>[ ${validPath.join(' + ')} ]</b> 连起来刚好是 ${TARGET_SUM} 哦！✨ 快去试试吧！`;
+                modalDesc.innerHTML = `<div class="ai-chat-bubble">${hintText}</div>`;
+                playSound('clear');
+            } else {
+                modalDesc.innerHTML = `<div class="ai-chat-bubble">哎呀，当前好像没有合适的组合了，也许需要重新开始这一关哦！🤔</div>`;
+                playSound('error');
+            }
+            
+            modalOverlay.style.display = 'flex';
+        }
+
+        // --- 新增：PWA 离线与安装支持 (单文件内联版黑魔法) ---
+        function setupPWA() {
+            if ('serviceWorker' in navigator) {
+                // 1. 动态生成内置的 SVG 桌面图标
+                const svgIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="100" fill="#48bb78"/><text x="256" y="360" font-size="320" font-family="Arial" font-weight="bold" fill="white" text-anchor="middle">+</text></svg>';
+                const iconUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgIcon)));
+                
+                // 适配苹果 iOS 桌面图标
+                let appleIcon = document.createElement('link');
+                appleIcon.rel = 'apple-touch-icon';
+                appleIcon.href = iconUrl;
+                document.head.appendChild(appleIcon);
+
+                // 2. 动态生成 manifest.json
+                const manifest = {
+                    name: "凑数大挑战",
+                    short_name: "凑数",
+                    start_url: "./",
+                    display: "standalone", // 独立应用模式，隐藏浏览器地址栏
+                    background_color: "#1e3c72",
+                    theme_color: "#1e3c72",
+                    icons: [{ src: iconUrl, sizes: "512x512", type: "image/svg+xml", purpose: "any maskable" }]
+                };
+                const manifestBlob = new Blob([JSON.stringify(manifest)], {type: 'application/manifest+json'});
+                
+                let manifestLink = document.createElement('link');
+                manifestLink.rel = 'manifest';
+                manifestLink.href = URL.createObjectURL(manifestBlob);
+                document.head.appendChild(manifestLink);
+
+                // 3. 动态生成并注册 Service Worker (实现拔了网线也能玩)
+                const swCode = `
+                    const CACHE_NAME = 'plus-math-v1';
+                    self.addEventListener('install', event => {
+                        event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(['./'])));
+                    });
+                    self.addEventListener('fetch', event => {
+                        event.respondWith(caches.match(event.request).then(res => res || fetch(event.request)));
+                    });
+                `;
+                const swBlob = new Blob([swCode], {type: 'application/javascript'});
+                navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(() => {});
+            }
+        }
+
+        // 初始化
+        window.onload = () => { 
+            loadProgress(); 
+            renderHome(); 
+            setupPWA(); // 启动 PWA 服务
+        };
+        
+        // 如果在选关界面旋转屏幕，重绘网格布局
+        window.onresize = () => {
+            if (gameScreen.style.display === 'flex') {
+                // 如果在游戏内旋转，为了避免残局错位，最简单的做法是不重置，依靠外层的 auto overflow 来滚动即可
+            }
+        };
+
+    </script>
+</body>
+</html>
